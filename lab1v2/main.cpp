@@ -4,12 +4,12 @@
 int main()
 {
 	HttpServer httpServer;
+	Logger::clearLogs("log.txt");
 
 	httpServer.init("127.0.0.1", "8000");
 	httpServer.listen();
 	while (true)
 	{
-
 		Socket client = httpServer.accept();
 
 		
@@ -22,6 +22,10 @@ int main()
 		}
 
 		int result = httpServer.recieve(client, buffer, maxSize, 0);
+		if (result == 0)
+		{
+			continue;
+		}
 		httpServer.handleRequest(client, buffer, result);
 	}
 

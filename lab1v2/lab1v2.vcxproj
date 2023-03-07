@@ -26,6 +26,7 @@
     <ClInclude Include="server.h" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="log.txt" />
     <Text Include="text.txt" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

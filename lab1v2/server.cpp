@@ -88,6 +88,8 @@ int HttpServer::init(const char* ipAddress, const char* port)
         freeaddrinfo(m_addr);
         return 1;
     }
+
+    return 0;
 }
 
 int HttpServer::listen()
@@ -110,19 +112,9 @@ Socket HttpServer::accept()
     return clientSocket;
 }
 
-int HttpServer::recieve(Socket & client, Buffer buffer, int flags)
-{
-    return ::recv(client.get(), buffer.getPointer(), buffer.size(), flags);
-}
-
 int HttpServer::recieve(Socket& client, char* buffer, int bufferSize, int flags)
 {
     return ::recv(client.get(), buffer, bufferSize, flags);
-}
-
-int HttpServer::send(Socket & client, Buffer buffer, int flags)
-{
-    return ::send(client.get(), buffer.getPointer(), buffer.size(), flags);
 }
 
 int HttpServer::send(Socket & client,const char* buffer, int bufferSize, int flags)
@@ -154,16 +146,18 @@ int HttpServer::handleRequest(Socket & client, char* request, int result)
 
     std::cout << request << std::endl;
     request[result] = '\0';
+    std::string uri = getRequestUri(request);
+    uri.erase(uri.length() - 1);
+
     std::string filePath = getFilePath(std::string(request));
     filePath = decodeURIComponent(filePath);
 
-    
 
     std::ifstream inFile(filePath, std::ios_base::binary);
-    
-    
     if (inFile.is_open())
     {
+        Logger::addToLogs("log.txt", uri + "; RESPOND: 200 OK");
+
         inFile.seekg(0, std::ios_base::end);
         size_t length = inFile.tellg();
         inFile.seekg(0, std::ios_base::beg);
@@ -173,8 +167,6 @@ int HttpServer::handleRequest(Socket & client, char* request, int result)
         std::copy(std::istreambuf_iterator<char>(inFile),
             std::istreambuf_iterator<char>(),
             std::back_inserter(buffer));
-        
-        std::cout << length << std::endl;
 
         std::string strBuffer(buffer.begin(), buffer.end());
 
@@ -189,6 +181,8 @@ int HttpServer::handleRequest(Socket & client, char* request, int result)
     else
     {
         std::cout << "can't open the file" << std::endl;
+
+        Logger::addToLogs("log.txt", uri + "; RESPOND: 404");
 
         response = response + "HTTP/1.1 404\r\n"
             + "Version: HTTP/1.1\r\n"

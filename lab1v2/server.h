@@ -3,11 +3,14 @@
 #include <sstream>
 #include <string>
 #include <regex>
+#include <fstream>
 
 #define _WIN32_WINNT 0x501
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 
+#include <thread>
+#include <vector>
 #pragma comment(lib, "Ws2_32.lib")
 
 class Socket
@@ -75,62 +78,63 @@ public:
 	 
 };
 
-class Buffer
+class Logger
 {
 public:
-	int m_bufferSize;
-	char* m_buffer;
+	static void clearLogs(const std::string& filename)
+	{
+		std::ofstream ofs;
+		ofs.open(filename, std::ofstream::out | std::ofstream::trunc);
+		ofs.close();
+	}
 
+	static void addToLogs(const std::string& filename, const std::string& data)
+	{
+		std::ofstream outfile;
+		outfile.open(filename, std::ios_base::app); // append instead of overwrite
+		outfile << data;
+		outfile.close();
+	}
+
+};
+
+class ThreadHandler
+{
+private:
+	static const int maxThreads = 10;
+	std::thread threadArr[maxThreads];
+	std::vector<bool> freeThreads;
 public:
-	Buffer() : m_bufferSize(0), m_buffer(0) {};
-
-	Buffer(int maxSize) : m_bufferSize(maxSize)
+	ThreadHandler()
 	{
-		init(maxSize);
-	}
-
-	void init(int maxSize)
-	{
-		if (m_bufferSize != 0)
+		for (int i = 0; i < maxThreads; ++i)
 		{
-			clear();
-		}
-		m_bufferSize = maxSize;
-		m_buffer = new char[m_bufferSize];
-		for (int i = 0; i < maxSize - 1; ++i)
-		{
-			m_buffer[i] = ' ';
-		}
-		m_buffer[maxSize - 1] = '\0';
-	}
-
-	char* getPointer()
-	{
-		return m_buffer;
-	}
-
-	int size() const
-	{
-		return m_bufferSize;
-	}
-
-	void clear()
-	{
-		if (m_bufferSize != 0)
-		{
-			m_bufferSize = 0;
-			delete[] m_buffer;
-			m_buffer = 0;
+			freeThreads.push_back(true);
 		}
 	}
 
-	~Buffer()
+	void setThreadStatus(int index, bool status)
 	{
-		if (m_bufferSize != 0)
+		freeThreads[index] = status;
+	}
+
+	int getFreeThread()
+	{
+		for (int i = 0; i < maxThreads; ++i)
 		{
-			m_bufferSize = 0;
-			delete[] m_buffer;
-			m_buffer = 0;
+			if (freeThreads[i] == true)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	~ThreadHandler()
+	{
+		for (int i = 0; i < maxThreads; ++i)
+		{
+			freeThreads.pop_back();
 		}
 	}
 };
@@ -141,17 +145,19 @@ private:
 
 	struct addrinfo* m_addr;
 	Socket m_serverSocket;
+	ThreadHandler * m_threadHandler;
 
 public:
-	HttpServer() : m_addr(0), m_serverSocket() {};
+	HttpServer() : m_addr(0), m_serverSocket() 
+	{
+		m_threadHandler = new ThreadHandler();
+	};
 
 	int init(const char * ipAddress, const char * port);
 	int listen();
 	Socket accept();
 
-	int recieve(Socket & client, Buffer buffer, int flags);
 	int recieve(Socket& client, char* buffer, int bufferSize, int flags);
-	int send(Socket & client, Buffer buffer, int flags);
 	int send(Socket & client, const char * buffer, int bufferSize, int flags);
 
 	std::string decodeURIComponent(const std::string & encoded);
